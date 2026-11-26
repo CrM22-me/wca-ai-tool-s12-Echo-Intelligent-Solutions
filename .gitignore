@@ -1,19 +1,17 @@
-# Environment variables and API keys
+# Environment variables and secrets
 .env
 .env.*
-!.env.example
 
 # Python cache files
 __pycache__/
 *.py[cod]
-*$py.class
 
 # Virtual environments
-.venv/
 venv/
-env/
+.venv/
 
-# IDE and system files
+# IDE settings
 .vscode/
-.DS_Store
-Thumbs.db
+
+# Temporary files
+*.tmp

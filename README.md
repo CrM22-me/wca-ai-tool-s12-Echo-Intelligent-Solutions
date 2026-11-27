@@ -114,6 +114,7 @@ Echo Intelligent Solutions – Project Team
 1. Simon Willy Sitati
 2. Akinyi Mercy
 3. Harrison Njogu
+4. Laban Rukenya
 
 10. Project Purpose
 

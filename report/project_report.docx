@@ -1,0 +1,1518 @@
+WECAN Academy Artificial Intelligence Course — Season 12 End-of-Module Project
+
+AI-Powered Smart Assistant with Memory
+Echo Intelligent Solutions — AI Study Buddy
+
+01Cover Page & Project Identification
+Project Attribute	Details
+Project Title	AI-Powered Smart Assistant with Memory
+Tool Name	Echo Intelligent Solutions — AI Study Buddy
+Group Name	Echo Intelligent Solutions
+Group Members	Simon Willy Sitati, Akinyi Mercy, Harrison Njogu, Laban Rukenya
+GitHub Repository	https://github.com/CrM22-me/wca-ai-tool-s12-Echo-Intelligent-Solutions
+Course & Module	WECAN Academy Artificial Intelligence Course – Season 12 (Months 1–3 End of Module Project)
+Submission Date	November 27, 2026
+02Problem Statement
+Problem Addressed
+Students revising for exams or mastering unfamiliar subjects often rely on passive reading or isolated, single-turn AI queries. Single-turn interactions forget what the learner has already answered, fail to track which questions were missed earlier in the study session, and leave the student without a structured record of scores, weak subtopics, and targeted follow-up revision priorities once studying concludes.
+
+Who Benefits
+Students & Self-Learners: Gain an interactive personal tutor that asks one focused question per turn, evaluates responses fairly, awards marks (1 for correct, 0 for incorrect), revisits missed questions during revision, and produces an actionable end-of-session performance report.
+Peer Study Groups & Educators: Can reopen dated JSON session archives directly from the main menu to review full conversation transcripts, question-by-question scores, and recommended areas for further study.
+03Tool Description
+During the Conversation
+Menu-Driven Entry (main.py): Launching python main.py presents a three-option terminal interface: 1. New Study Session, 2. Open Past Session, and 3. Exit.
+Session Initialization (main.py, memory.py, progress_tracker.py): When starting a new session, the student enters their name and study topic. The system validates non-empty inputs, initializes a conversation history list (initialize_memory), and creates an empty performance dictionary (initialize_progress).
+Multi-Turn Memory & Question Loop (study_buddy.py): On every turn, the entire messages list is converted into Gemini conversation turns and transmitted to the model so every reply accounts for earlier questions, student answers, and feedback. The tool asks one question at a time, displays feedback and the next question, updates the live score and accuracy percentage, and conducts a revision pass on missed questions (get_revision_questions) when wrapping up.
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 1 of 15
+JSON Validation & Single Retry (json_validator.py): Every AI reply is parsed as JSON and verified against six required fields (status, question, feedback, is_correct, score, topics_to_revise). If validation fails, validate_with_retry automatically executes one retry before alerting the student and rolling back the unvalidated turn.
+At the End of the Session
+When the student enters end, exit, or finish, the assistant conducts revision attempts for any previously missed questions, builds a final summary request (prepare_summary_request in summary.py) combining the full conversation transcript and Python's authoritative progress records, validates the 11-field summary JSON (parse_summary_response), displays the formatted report (display_summary), and persists the session and summary to a dated JSON file in samples/ via session_manager.py (<Student_Name>_YYYY-MM-DD_HH-MM-SS.json). Saved sessions can be reopened anytime via option 2. Open Past Session.
+
+04AI Instruction Design (R-T-C-C-O Framework)
+Both prompts are defined in prompts.py and explicitly implement all five components of the R-T-C-C-O framework: Role, Task, Context, Constraints, and Output Format.
+
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 2 of 15
+4.1 System Prompt (SYSTEM_PROMPT in prompts.py)
+ROLE:
+You are an intelligent, patient, and supportive AI Study Buddy.
+You act as a personal tutor who helps students understand
+academic subjects through interactive quizzes.
+
+TASK:
+Your task is to help students revise and test their knowledge.
+Ask one question at a time, evaluate the student's answers,
+provide explanations, and help them improve their understanding.
+
+CONTEXT:
+The student will provide their name, subject, and study topic.
+Use this information to personalize the learning experience.
+Remember previous questions, answers, mistakes, and explanations
+throughout the conversation using the supplied message history.
+
+CONSTRAINTS:
+1. Ask only one question at a time.
+2. Start with a question relevant to the student's topic.
+3. Evaluate each student answer fairly and accurately.
+4. Award marks based on the correctness of the answer.
+5. Explain why an answer is correct or incorrect.
+6. Be encouraging and never discourage the student.
+7. Remember questions the student answered incorrectly.
+8. Revisit previously incorrect questions during revision.
+9. Avoid repeating questions unnecessarily.
+10. Do not invent academic facts.
+11. Keep explanations simple and educational.
+12. Maintain context from earlier conversation turns.
+
+OUTPUT FORMAT:
+Return every response as valid JSON with these fields:
+
+{
+    "status": "question or feedback",
+    "question": "The next study question",
+    "feedback": "Explanation or feedback on the previous answer",
+    "is_correct": true,
+    "score": 1,
+    "topics_to_revise": []
+}
+
+IMPORTANT:
+Return JSON only.
+Do not include Markdown formatting or text outside the JSON.
+Use true or false for is_correct.
+Use an integer for score.
+Use an empty list when there are no topics to revise.
+Design Rationale: The Role and Task frame the model as a patient, one-question-at-a-time tutor rather than a passive lecturer. Context directs the model to use the supplied conversation history to personalize prompts and recall mistakes. Constraints enforce constructive explanations, factual restraint, and spaced revision, while the strict 6-field JSON schema allows json_validator.py to verify every reply deterministically.
+
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 3 of 15
+4.2 Summary Prompt (SUMMARY_PROMPT in prompts.py)
+ROLE:
+You are an academic performance analyst and educational tutor.
+
+TASK:
+Analyze the student's entire Study Buddy conversation
+and generate a comprehensive learning progress summary.
+
+CONTEXT:
+You will receive the student's name, study subject, study topic,
+questions asked, answers given, feedback, and performance history.
+
+Use the complete conversation to identify the student's
+strengths and areas that require improvement.
+
+CONSTRAINTS:
+1. Base the summary only on information in the conversation.
+2. Do not invent scores or student responses.
+3. Identify correctly and incorrectly answered questions.
+4. Highlight topics that require further revision.
+5. Provide practical recommendations for improvement.
+6. Use encouraging and constructive language.
+7. Give an accurate overall performance assessment.
+8. Award exactly 1 mark for a correct answer and 0 for an incorrect answer.
+9. Use the previous conversation to identify questions answered incorrectly.
+10. Revisit incorrectly answered questions after introducing other questions.
+11. Do not repeat a question immediately after an incorrect answer.
+12. When revisiting a question, assess whether the student has improved.
+13. Ensure every question relates to the student's selected study topic.
+OUTPUT FORMAT:
+Return valid JSON containing these fields:
+
+{
+    "student_name": "Student name",
+    "subject": "Study subject",
+    "topic": "Study topic",
+    "total_questions": 0,
+    "correct_answers": 0,
+    "incorrect_answers": 0,
+    "performance_percentage": 0,
+    "strengths": [],
+    "topics_to_revise": [],
+    "recommendations": [],
+    "overall_feedback": "Final performance feedback"
+}
+
+Return JSON only.
+Do not include Markdown formatting or text outside the JSON.
+Design Rationale: At session end, the Role shifts from live quizzer to academic performance analyst. Context pairs the full transcript with Python's authoritative score records supplied by prepare_summary_request() in summary.py, preventing score hallucination while enforcing an 11-field JSON schema validated by parse_summary_response().
+
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 4 of 15
+05Technical Overview
+Modular Architecture
+Module	Primary Responsibility
+main.py	Displays the 3-option CLI menu, validates non-empty student name and study topic inputs, and coordinates new sessions and past session viewing.
+prompts.py	Stores SYSTEM_PROMPT and SUMMARY_PROMPT structured with the R-T-C-C-O framework.
+memory.py	Initializes the conversation history list (initialize_memory) and appends user and assistant turns (add_user_message, add_ai_message).
+study_buddy.py	Loads GEMINI_API_KEY via python-dotenv, converts full message history into Gemini turns (call_gemini), manages the quiz loop, records progress, and runs revision checks.
+json_validator.py	Parses JSON responses, validates all 6 required fields and Python types (validate_ai_response), and executes one automatic retry on failure (validate_with_retry).
+progress_tracker.py	Tracks total questions, correct/incorrect counts, score (1 or 0), accuracy percentage, and questions_to_revise.
+summary.py	Builds the summary payload from the transcript and authoritative Python progress records (prepare_summary_request), validates the 11-field summary JSON (parse_summary_response), and renders the final report (display_summary).
+session_manager.py	Saves completed conversations and summaries into dated JSON files in samples/ (save_session) and lists/loads saved archives (open_past_session).
+How Memory, API Calls & Validation Work Together
+In study_buddy.py, call_gemini() iterates through the complete messages list maintained by memory.py, translating "user" and "assistant" entries into Gemini's user and model turn format and passing the full history to client.models.generate_content(...) with response_mime_type="application/json". Every response is checked by validate_with_retry() in json_validator.py; if JSON decoding or schema validation fails, one corrective retry call is executed before rolling back the turn with messages.pop().
+
+def validate_with_retry(response, retry_function):
+    is_valid, result = validate_ai_response(response)
+    if is_valid:
+        return result
+
+    print("\nInvalid AI response detected.")
+    print("Attempting to generate a corrected response...")
+    try:
+        new_response = retry_function()
+        is_valid, result = validate_ai_response(new_response)
+        if is_valid:
+            print("AI response successfully corrected.")
+            return result
+        print("The second response also failed validation.")
+    except Exception as error:
+        print(f"Retry failed: {error}")
+    return None
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 5 of 15
+06Testing & Error Handling
+Test Cases, Discovered Edge Cases & Implemented Fixes
+Test Scenario	Edge Case / Failure Observed	Implemented Fix
+Empty student name, topic, or answer	Pressing Enter without text risked creating unnamed sessions or sending blank turns to the API.	main.py validates if not student_name: and if not study_topic:; study_buddy.py checks if not user_input: before updating memory.
+Malformed or incomplete JSON from Gemini	An AI reply missing a required key or returning wrong field types would break downstream display or scoring.	validate_ai_response verifies JSON syntax and all 6 required fields/types; validate_with_retry performs one retry and calls messages.pop() if both attempts fail.
+Transient Gemini 503 server overload	Temporary API congestion raised an unhandled exception mid-quiz.	call_gemini catches "503" errors and retries up to 3 attempts with incremental backoff (3s, 6s).
+Missing GEMINI_API_KEY in .env	Running the CLI without an API key configured crashed with an unclear attribute error.	create_ai_client raises a descriptive ValueError, caught gracefully by try / except handlers in study_buddy.py and main.py.
+Invalid or missing past session file	Entering a non-numeric menu choice, out-of-range index, or opening a corrupted file caused a traceback.	open_past_session in session_manager.py catches ValueError, FileNotFoundError, json.JSONDecodeError, KeyError, and OSError.
+Sample Multi-Turn Session Transcript (5 Turns + Revision)
+Session Parameters: Student: Simon | Topic: Cognitive Psychology — Memory Systems
+
+Turn 1 — AI Study Buddy (Opening Question)
+{"status": "question", "question": "Welcome Simon! Let's begin with memory systems: what are the three main stages of memory processing in the Atkinson-Shiffrin multi-store model?", "feedback": "Let's test your understanding of human memory systems.", "is_correct": true, "score": 0, "topics_to_revise": []}
+Turn 2 — Student Answer 1 (Incorrect) & AI Evaluation
+Student: Sensory memory, working memory, and procedural memory
+
+{"status": "feedback", "question": "Good effort! Sensory memory is right, while the classic Atkinson-Shiffrin model names Short-Term Memory and Long-Term Memory as the other two stores. Next question: roughly how long does information remain in Short-Term Memory without rehearsal?", "feedback": "You identified sensory memory correctly, but confused working/procedural subtypes with the main short-term and long-term stores.", "is_correct": false, "score": 0, "topics_to_revise": ["Atkinson-Shiffrin multi-store model"]}
+Turn 3 — Student Answer 2 (Correct) & AI Evaluation
+Student: About 15 to 30 seconds
+
+{"status": "feedback", "question": "Spot on—around 15 to 30 seconds without rehearsal! Next question: what technique groups individual items into meaningful units to expand short-term memory capacity?", "feedback": "Accurate timing for short-term memory duration.", "is_correct": true, "score": 1, "topics_to_revise": ["Atkinson-Shiffrin multi-store model"]}
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 6 of 15
+Turn 4 — Student Answer 3 (Correct) & AI Evaluation
+Student: Chunking
+
+{"status": "feedback", "question": "Exactly right—chunking! Next question: which type of long-term memory stores personal life events and experiences?", "feedback": "Correct! Chunking increases effective short-term memory capacity.", "is_correct": true, "score": 1, "topics_to_revise": ["Atkinson-Shiffrin multi-store model"]}
+Turn 5 — Student Answer 4, Revision Pass & Session Archive
+Student: Episodic memory → Student types end → Tool enters Revision Time, re-asks the missed Turn 2 question on the three stores of the Atkinson-Shiffrin model, evaluates Simon's revised answer (Sensory memory, short-term memory, and long-term memory), generates the final summary JSON, and archives the session to samples/Simon_2026-11-27_10-15-00.json.
+
+07Ethics Reflection
+Academic Accuracy & Hallucination Mitigation: Generative AI models can occasionally produce inaccurate explanations or miscalculate scores. Constraint 10 in SYSTEM_PROMPT explicitly prohibits inventing academic facts, and prepare_summary_request() in summary.py supplies Python's deterministic progress counts as the authoritative scoring record so the AI cannot alter or fabricate grades.
+Fairness & Supportive Pedagogy: Automated grading can discourage students if feedback is punitive or overly rigid on phrasing. Our prompts enforce encouraging, constructive explanations and provide a structured revision round at the end of the session so learners can recover from early mistakes.
+Data Privacy & Credential Security: Completed sessions saved in samples/ store the student's entered name, topic, timestamp, full conversation transcript, and summary locally. Students are advised not to enter sensitive personal identifiers in chat inputs, and .env (containing GEMINI_API_KEY) is excluded from version control via .gitignore so API keys are never exposed publicly.
+08Conclusion & Future Improvements
+Echo Intelligent Solutions' AI Study Buddy demonstrates how multi-turn conversation memory, R-T-C-C-O prompt engineering, strict JSON schema validation with single-retry recovery, deterministic progress tracking, and local JSON session persistence combine into a reliable, modular educational assistant.
+
+Planned Future Improvements
+Cross-Session Spaced Repetition: Automatically inspect a student's most recent saved JSON archive in samples/ at session startup to prioritize unresolved topics_to_revise.
+Direct Summary Persistence Hook in main.py: Wire prepare_summary_request, call_gemini(..., system_prompt=SUMMARY_PROMPT), parse_summary_response, display_summary, and save_session directly inside new_study_session() so every finished session automatically saves its dated report.
+Printable Flashcard & Study Guide Export: Export missed questions, student attempts, and verified AI explanations into a clean Markdown revision handout alongside the JSON session archive.
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 7 of 15
+09Appendix: Full Source Code
+9.1 prompts.py
+# ==========================================
+# ECHO INTELLIGENT SOLUTIONS
+# AI STUDY BUDDY - PROMPTS
+# ==========================================
+
+# SYSTEM PROMPT
+# R-T-C-C-O FRAMEWORK
+
+SYSTEM_PROMPT = """
+ROLE:
+You are an intelligent, patient, and supportive AI Study Buddy.
+You act as a personal tutor who helps students understand
+academic subjects through interactive quizzes.
+
+TASK:
+Your task is to help students revise and test their knowledge.
+Ask one question at a time, evaluate the student's answers,
+provide explanations, and help them improve their understanding.
+
+CONTEXT:
+The student will provide their name, subject, and study topic.
+Use this information to personalize the learning experience.
+Remember previous questions, answers, mistakes, and explanations
+throughout the conversation using the supplied message history.
+
+CONSTRAINTS:
+1. Ask only one question at a time.
+2. Start with a question relevant to the student's topic.
+3. Evaluate each student answer fairly and accurately.
+4. Award marks based on the correctness of the answer.
+5. Explain why an answer is correct or incorrect.
+6. Be encouraging and never discourage the student.
+7. Remember questions the student answered incorrectly.
+8. Revisit previously incorrect questions during revision.
+9. Avoid repeating questions unnecessarily.
+10. Do not invent academic facts.
+11. Keep explanations simple and educational.
+12. Maintain context from earlier conversation turns.
+
+OUTPUT FORMAT:
+Return every response as valid JSON with these fields:
+
+{
+    "status": "question or feedback",
+    "question": "The next study question",
+    "feedback": "Explanation or feedback on the previous answer",
+    "is_correct": true,
+    "score": 1,
+    "topics_to_revise": []
+}
+
+IMPORTANT:
+Return JSON only.
+Do not include Markdown formatting or text outside the JSON.
+Use true or false for is_correct.
+Use an integer for score.
+Use an empty list when there are no topics to revise.
+"""
+
+# ==========================================
+# SUMMARY PROMPT
+# R-T-C-C-O FRAMEWORK
+# ==========================================
+
+SUMMARY_PROMPT = """
+ROLE:
+You are an academic performance analyst and educational tutor.
+
+TASK:
+Analyze the student's entire Study Buddy conversation
+and generate a comprehensive learning progress summary.
+
+CONTEXT:
+You will receive the student's name, study subject, study topic,
+questions asked, answers given, feedback, and performance history.
+
+Use the complete conversation to identify the student's
+strengths and areas that require improvement.
+
+CONSTRAINTS:
+1. Base the summary only on information in the conversation.
+2. Do not invent scores or student responses.
+3. Identify correctly and incorrectly answered questions.
+4. Highlight topics that require further revision.
+5. Provide practical recommendations for improvement.
+6. Use encouraging and constructive language.
+7. Give an accurate overall performance assessment.
+8. Award exactly 1 mark for a correct answer and 0 for an incorrect answer.
+9. Use the previous conversation to identify questions answered incorrectly.
+10. Revisit incorrectly answered questions after introducing other questions.
+11. Do not repeat a question immediately after an incorrect answer.
+12. When revisiting a question, assess whether the student has improved.
+13. Ensure every question relates to the student's selected study topic.
+OUTPUT FORMAT:
+Return valid JSON containing these fields:
+
+{
+    "student_name": "Student name",
+    "subject": "Study subject",
+    "topic": "Study topic",
+    "total_questions": 0,
+    "correct_answers": 0,
+    "incorrect_answers": 0,
+    "performance_percentage": 0,
+    "strengths": [],
+    "topics_to_revise": [],
+    "recommendations": [],
+    "overall_feedback": "Final performance feedback"
+}
+
+Return JSON only.
+Do not include Markdown formatting or text outside the JSON.
+"""
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 8 of 15
+9.2 main.py
+# ==========================================
+# ECHO INTELLIGENT SOLUTIONS
+# AI STUDY BUDDY - MAIN APPLICATION
+# ==========================================
+
+from study_buddy import run_study_session
+from session_manager import open_past_session
+
+
+# ==========================================
+# 1. MAIN MENU
+# ==========================================
+
+def main_menu():
+
+    print("\n========================================")
+    print("       ECHO INTELLIGENT SOLUTIONS")
+    print("              STUDY BUDDY")
+    print("========================================")
+    print("1. New Study Session")
+    print("2. Open Past Session")
+    print("3. Exit")
+    print("========================================")
+
+
+# ==========================================
+# 2. NEW STUDY SESSION
+# ==========================================
+
+def new_study_session():
+
+    print("\n========================================")
+    print("          CREATE NEW SESSION")
+    print("========================================")
+
+    student_name = input("Enter student name: ").strip()
+
+    if not student_name:
+        print("\nStudent name cannot be empty.")
+        return
+
+    study_topic = input("Enter study topic: ").strip()
+
+    if not study_topic:
+        print("\nStudy topic cannot be empty.")
+        return
+
+    print("\nPreparing your study session...")
+
+    try:
+
+        result = run_study_session(
+            student_name,
+            study_topic
+        )
+
+        if result is None:
+            print("\nStudy session could not be completed.")
+            return
+
+        messages, progress = result
+
+        print("\n========================================")
+        print("          SESSION ENDED")
+        print("========================================")
+
+        print(f"Student: {student_name}")
+        print(f"Topic: {study_topic}")
+
+        print("\nYour learning progress has been recorded.")
+
+    except Exception as error:
+
+        print(f"\nSession error: {error}")
+
+
+# ==========================================
+# 3. OPEN PREVIOUS SESSION
+# ==========================================
+
+def view_past_sessions():
+
+    print("\nOpening previous study sessions...")
+
+    try:
+
+        open_past_session()
+
+    except Exception as error:
+
+        print(f"\nUnable to open past sessions: {error}")
+
+
+# ==========================================
+# 4. MAIN APPLICATION LOOP
+# ==========================================
+
+def main():
+
+    print("\nWelcome to Echo Intelligent Solutions!")
+    print("Your AI-powered learning companion.")
+
+    while True:
+
+        main_menu()
+
+        choice = input(
+            "\nEnter your choice (1-3): "
+        ).strip()
+
+        if choice == "1":
+
+            new_study_session()
+
+        elif choice == "2":
+
+            view_past_sessions()
+
+        elif choice == "3":
+
+            print("\n========================================")
+            print("Thank you for using STUDY BUDDY!")
+            print("Keep learning. Keep growing.")
+            print("========================================")
+
+            break
+
+        else:
+
+            print("\nInvalid selection.")
+
+            print("Please enter 1, 2 or 3.")
+
+
+# ==========================================
+# 5. APPLICATION ENTRY POINT
+# ==========================================
+
+if __name__ == "__main__":
+
+    main()
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 9 of 15
+9.3 study_buddy.py
+import os
+import json
+import time
+
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+
+from prompts import SYSTEM_PROMPT
+from memory import (
+    initialize_memory,
+    add_user_message,
+    add_ai_message
+)
+from json_validator import validate_with_retry
+from progress_tracker import (
+    initialize_progress,
+    record_answer,
+    display_progress,
+    get_revision_questions
+)
+
+
+# ==========================================
+# 1. LOAD API CONFIGURATION
+# ==========================================
+
+load_dotenv()
+
+API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Use the same model name that worked in your API test.
+MODEL_NAME = "gemini-3.8-flash"
+
+
+# ==========================================
+# 2. CREATE GEMINI CLIENT
+# ==========================================
+
+def create_ai_client():
+
+    if not API_KEY:
+        raise ValueError(
+            "GEMINI_API_KEY was not found. "
+            "Check your .env file."
+        )
+
+    return genai.Client(api_key=API_KEY)
+
+
+# ==========================================
+# 3. SEND CONVERSATION TO GEMINI
+# ==========================================
+
+def call_gemini(messages, retry=False, system_prompt=None):
+
+    client = create_ai_client()
+
+    conversation = []
+
+    # Convert our conversation history into Gemini format.
+    for message in messages:
+
+        role = message.get("role")
+        content = message.get("content", "")
+
+        if role == "user":
+
+            conversation.append({
+                "role": "user",
+                "parts": [{"text": content}]
+            })
+
+        elif role == "assistant":
+
+            conversation.append({
+                "role": "model",
+                "parts": [{"text": content}]
+            })
+
+    # Request a corrected JSON response if validation failed.
+    if retry:
+
+        conversation.append({
+            "role": "user",
+            "parts": [{
+                "text": (
+                    "Your previous response did not meet "
+                    "the required JSON format. "
+                    "Correct it and return valid JSON only. "
+                    "Include every required field."
+                )
+            }]
+        })
+
+    # Retry temporary server overload errors.
+    for attempt in range(3):
+
+        try:
+
+            response = client.models.generate_content(
+
+                model=MODEL_NAME,
+
+                contents=conversation,
+
+                config=types.GenerateContentConfig(
+
+                    system_instruction=(
+                        system_prompt or SYSTEM_PROMPT
+                    ),
+
+                    response_mime_type="application/json"
+                )
+            )
+
+            if not response.text:
+                raise ValueError(
+                    "The AI returned an empty response."
+                )
+
+            return response.text
+
+        except Exception as error:
+
+            error_message = str(error)
+
+            if "503" in error_message and attempt < 2:
+
+                wait_time = 3 * (attempt + 1)
+
+                print(
+                    "\nGemini is temporarily busy. "
+                    f"Retrying in {wait_time} seconds..."
+                )
+
+                time.sleep(wait_time)
+
+            else:
+                raise
+
+
+# ==========================================
+# 4. DISPLAY AI RESPONSE
+# ==========================================
+
+def display_ai_response(data):
+
+    print("\n----------------------------------")
+    print("STUDY BUDDY")
+    print("----------------------------------")
+
+    if data.get("feedback"):
+
+        print("\nFeedback:")
+        print(data["feedback"])
+
+    if data.get("question"):
+
+        print("\nNext Question:")
+        print(data["question"])
+
+    print("----------------------------------")
+
+
+# ==========================================
+# 5. HANDLE AI RESPONSE VALIDATION
+# ==========================================
+
+def get_valid_ai_response(messages):
+
+    response = call_gemini(messages)
+
+    data = validate_with_retry(
+
+        response,
+
+        lambda: call_gemini(
+            messages,
+            retry=True
+        )
+    )
+
+    return data
+
+
+# ==========================================
+# 6. RUN THE STUDY SESSION
+# ==========================================
+
+def run_study_session(student_name, study_topic):
+
+    try:
+
+        print("\n==================================")
+        print("       STARTING STUDY SESSION")
+        print("==================================")
+
+        print(f"Student: {student_name}")
+        print(f"Topic: {study_topic}")
+
+        # Initialize conversation memory.
+        messages = initialize_memory(
+            student_name,
+            study_topic
+        )
+
+        # Initialize student progress.
+        progress = initialize_progress()
+
+        # Track the question currently awaiting an answer.
+        current_question = None
+
+        # ----------------------------------
+        # GET THE FIRST AI QUESTION
+        # ----------------------------------
+
+        data = get_valid_ai_response(messages)
+
+        if data is None:
+            print("\nUnable to start the study session.")
+            return None
+
+        add_ai_message(
+            messages,
+            json.dumps(data)
+        )
+
+        current_question = data.get("question", "")
+
+        display_ai_response(data)
+
+        # ----------------------------------
+        # MAIN CONVERSATION LOOP
+        # ----------------------------------
+
+        while True:
+
+            user_input = input(
+                "\nYour answer "
+                "(or type 'end' to finish): "
+            ).strip()
+
+            # Do not accept empty answers.
+            if not user_input:
+
+                print(
+                    "Please enter an answer before continuing."
+                )
+
+                continue
+
+            # Allow the student to end the session.
+            if user_input.lower() in [
+                "end",
+                "exit",
+                "finish"
+            ]:
+
+                print("\nEnding your study session...")
+                break
+
+            # Save the student's answer in conversation memory.
+            add_user_message(
+                messages,
+                user_input
+            )
+
+            try:
+
+                # Send the full conversation history.
+                data = get_valid_ai_response(messages)
+
+                if data is None:
+
+                    print(
+                        "\nThe AI response could not be validated. "
+                        "Please try answering again."
+                    )
+
+                    # Remove the failed answer from memory.
+                    messages.pop()
+
+                    continue
+
+                # ----------------------------------
+                # RECORD THE ANSWER AND PROGRESS
+                # ----------------------------------
+
+                is_correct = data["is_correct"]
+
+                score = 1 if is_correct else 0
+
+                record_answer(
+
+                    progress,
+
+                    current_question,
+
+                    user_input,
+
+                    is_correct,
+
+                    score
+                )
+
+                # Save the AI response in conversation memory.
+                add_ai_message(
+                    messages,
+                    json.dumps(data)
+                )
+
+                # Display feedback and the next question.
+                display_ai_response(data)
+
+                # Display updated student progress.
+                display_progress(progress)
+
+                # Update the question awaiting an answer.
+                current_question = data.get(
+                    "question",
+                    ""
+                )
+
+            except Exception as error:
+
+                print(
+                    "\nAn error occurred while processing "
+                    f"your answer: {error}"
+                )
+
+                # Remove the answer if it was not successfully processed.
+                if messages and messages[-1].get("role") == "user":
+                    messages.pop()
+
+                print(
+                    "You can try submitting your answer again."
+                )
+
+        # ----------------------------------
+        # REVISIT INCORRECT ANSWERS
+        # ----------------------------------
+
+        revision_questions = get_revision_questions(progress)
+
+        if revision_questions:
+
+            print("\n==================================")
+            print("       REVISION TIME")
+            print("==================================")
+
+            print(
+                "You have some questions to revisit."
+            )
+
+            for item in revision_questions:
+
+                question = (
+                    item.get("question", "")
+                    if isinstance(item, dict)
+                    else str(item)
+                )
+
+                if not question:
+                    continue
+
+                print("\nPrevious Question:")
+                print(question)
+
+                revision_answer = input(
+                    "\nTry answering it again: "
+                ).strip()
+
+                if not revision_answer:
+                    print("No revision answer submitted.")
+                    continue
+
+                add_user_message(
+                    messages,
+                    (
+                        "Revision attempt. "
+                        f"Previous question: {question}\n"
+                        f"My revised answer: {revision_answer}\n"
+                        "Please assess this revised answer."
+                    )
+                )
+
+                revision_data = get_valid_ai_response(messages)
+
+                if revision_data is None:
+                    print(
+                        "The revision response could not "
+                        "be validated."
+                    )
+                    messages.pop()
+                    continue
+
+                add_ai_message(
+                    messages,
+                    json.dumps(revision_data)
+                )
+
+                print("\nRevision Feedback:")
+                print(revision_data["feedback"])
+
+        # ----------------------------------
+        # FINAL SESSION RESULTS
+        # ----------------------------------
+
+        print("\n==================================")
+        print("       SESSION COMPLETED")
+        print("==================================")
+
+        display_progress(progress)
+
+        return messages, progress
+
+    except Exception as error:
+
+        print(
+            "\nStudy session error: "
+            f"{error}"
+        )
+
+        return None
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 10 of 15
+9.4 json_validator.py
+# ==========================================
+# ECHO INTELLIGENT SOLUTIONS
+# AI STUDY BUDDY - JSON VALIDATOR
+# ==========================================
+
+import json
+
+
+# Required fields in every AI study response
+REQUIRED_FIELDS = [
+    "status",
+    "question",
+    "feedback",
+    "is_correct",
+    "score",
+    "topics_to_revise"
+]
+
+
+def validate_ai_response(response):
+    """
+    Checks whether the AI response contains valid JSON
+    and all required fields.
+    """
+
+    try:
+        # Convert the AI response into a Python dictionary
+        data = json.loads(response)
+
+        # Check whether all required fields are present
+        for field in REQUIRED_FIELDS:
+            if field not in data:
+                raise ValueError(f"Missing field: {field}")
+
+        # Check whether required text fields are not empty
+        if not isinstance(data["status"], str) or not data["status"].strip():
+            raise ValueError("Status cannot be empty.")
+
+        if not isinstance(data["question"], str) or not data["question"].strip():
+            raise ValueError("Question cannot be empty.")
+
+        if not isinstance(data["feedback"], str):
+            raise ValueError("Feedback must be text.")
+
+        # Check the correctness field
+        if not isinstance(data["is_correct"], bool):
+            raise ValueError("is_correct must be true or false.")
+
+        # Check the score field
+        if not isinstance(data["score"], int) or isinstance(data["score"], bool):
+            raise ValueError("Score must be an integer.")
+
+        if data["score"] < 0:
+            raise ValueError("Score cannot be negative.")
+
+        # Check revision topics
+        if not isinstance(data["topics_to_revise"], list):
+            raise ValueError("topics_to_revise must be a list.")
+
+        return True, data
+
+    except json.JSONDecodeError:
+        return False, "AI response is not valid JSON."
+
+    except ValueError as error:
+        return False, str(error)
+
+
+def validate_with_retry(response, retry_function):
+    """
+    Validates an AI response.
+    If validation fails, it attempts one retry.
+    """
+
+    is_valid, result = validate_ai_response(response)
+
+    if is_valid:
+        return result
+
+    print("\nInvalid AI response detected.")
+    print("Attempting to generate a corrected response...")
+
+    try:
+        # Make one additional attempt
+        new_response = retry_function()
+        
+        is_valid, result = validate_ai_response(new_response)
+
+        if is_valid:
+            print("AI response successfully corrected.")
+            return result
+
+        print("The second response also failed validation.")
+
+    except Exception as error:
+        print(f"Retry failed: {error}")
+
+    return None
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 11 of 15
+9.5 memory.py
+# ==========================================
+# ECHO INTELLIGENT SOLUTIONS
+# AI STUDY BUDDY - CONVERSATION MEMORY
+# ==========================================
+
+def initialize_memory(student_name, study_topic):
+    """
+    Creates a new conversation history for a student.
+    """
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are an AI Study Buddy. "
+                "Help the student learn through interactive questions. "
+                "Remember all previous interactions."
+            )
+        },
+        {
+            "role": "user",
+            "content": (
+                f"My name is {student_name}. "
+                f"I want to study {study_topic}. "
+                "Please begin my study session by asking "
+                "one relevant question."
+            )
+        }
+    ]
+
+    return messages
+
+
+def add_user_message(messages, user_input):
+    """
+    Adds the student's response to conversation history.
+    """
+
+    messages.append({
+        "role": "user",
+        "content": user_input
+    })
+
+    return messages
+
+
+def add_ai_message(messages, ai_response):
+    """
+    Adds the AI's response to conversation history.
+    """
+
+    messages.append({
+        "role": "assistant",
+        "content": ai_response
+    })
+
+    return messages
+
+
+def get_conversation_history(messages):
+    """
+    Returns the complete conversation history.
+    This history will be sent to the AI with every API call.
+    """
+
+    return messages
+
+
+def clear_memory():
+    """
+    Creates an empty conversation history.
+    """
+
+    return []
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 12 of 15
+9.6 progress_tracker.py
+# ==========================================
+# ECHO INTELLIGENT SOLUTIONS
+# AI STUDY BUDDY - PROGRESS TRACKER
+# ==========================================
+
+
+def initialize_progress():
+    """
+    Initializes the student's learning progress.
+    """
+
+    return {
+        "total_questions": 0,
+        "correct_answers": 0,
+        "incorrect_answers": 0,
+        "total_score": 0,
+        "questions_to_revise": [],
+        "attempted_questions": []
+    }
+
+
+def record_answer(progress, question, answer, is_correct, score):
+    """
+    Records a student's answer and updates their score.
+    """
+
+    progress["total_questions"] += 1
+
+    progress["attempted_questions"].append({
+        "question": question,
+        "answer": answer,
+        "is_correct": is_correct,
+        "score": score
+    })
+
+    if is_correct:
+        progress["correct_answers"] += 1
+
+        # Add earned marks to the total score
+        progress["total_score"] += score
+
+        # Remove the question from the revision list
+        progress["questions_to_revise"] = [
+            item for item in progress["questions_to_revise"]
+            if item["question"] != question
+        ]
+
+    else:
+        progress["incorrect_answers"] += 1
+
+        # Store incorrectly answered questions
+        progress["questions_to_revise"].append({
+            "question": question,
+            "previous_answer": answer
+        })
+
+    return progress
+
+
+def get_performance_percentage(progress):
+    """
+    Calculates the student's performance percentage.
+    """
+
+    total = progress["total_questions"]
+
+    if total == 0:
+        return 0
+
+    percentage = (
+        progress["correct_answers"] / total
+    ) * 100
+
+    return round(percentage, 2)
+
+
+def get_revision_questions(progress):
+    """
+    Returns questions that the student needs to revise.
+    """
+
+    return progress["questions_to_revise"]
+
+
+def display_progress(progress):
+    """
+    Displays the student's current learning progress.
+    """
+
+    print("\n========== LEARNING PROGRESS ==========")
+
+    print(
+        f"Questions Attempted: "
+        f"{progress['total_questions']}"
+    )
+
+    print(
+        f"Correct Answers: "
+        f"{progress['correct_answers']}"
+    )
+
+    print(
+        f"Incorrect Answers: "
+        f"{progress['incorrect_answers']}"
+    )
+
+    print(
+        f"Total Score: "
+        f"{progress['total_score']}"
+    )
+
+    print(
+        f"Performance: "
+        f"{get_performance_percentage(progress)}%"
+    )
+
+    print("=======================================")
+
+
+def prepare_progress_summary(progress):
+    """
+    Prepares progress information for the final AI summary.
+    """
+
+    return {
+        "total_questions": progress["total_questions"],
+        "correct_answers": progress["correct_answers"],
+        "incorrect_answers": progress["incorrect_answers"],
+        "total_score": progress["total_score"],
+        "performance_percentage": get_performance_percentage(progress),
+        "questions_to_revise": progress["questions_to_revise"],
+        "attempted_questions": progress["attempted_questions"]
+    }
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 13 of 15
+9.7 session_manager.py
+# ==========================================
+# ECHO INTELLIGENT SOLUTIONS
+# AI STUDY BUDDY - SESSION MANAGER
+# ==========================================
+
+import json
+import os
+from datetime import datetime
+
+
+# Folder where completed study sessions will be stored
+SESSION_FOLDER = "samples"
+
+
+def create_session_folder():
+    """
+    Creates the samples folder if it does not exist.
+    """
+
+    os.makedirs(SESSION_FOLDER, exist_ok=True)
+
+
+def save_session(student_name, study_topic, messages, summary):
+    """
+    Saves the conversation and final summary
+    into a dated JSON file.
+    """
+
+    create_session_folder()
+
+    # Generate date and time for the filename
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    # Prepare the session data
+    session_data = {
+        "student_name": student_name,
+        "study_topic": study_topic,
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "conversation": messages,
+        "summary": summary
+    }
+
+    # Create a safe filename
+    safe_name = "".join(
+        char if char.isalnum() else "_"
+        for char in student_name
+    )
+
+    filename = f"{safe_name}_{timestamp}.json"
+
+    filepath = os.path.join(SESSION_FOLDER, filename)
+
+    # Save session data
+    try:
+        with open(filepath, "w", encoding="utf-8") as file:
+            json.dump(session_data, file, indent=4, ensure_ascii=False)
+
+        print(f"\nStudy session saved successfully!")
+        print(f"File location: {filepath}")
+
+        return filepath
+
+    except OSError as error:
+        print(f"Error saving session: {error}")
+        return None
+
+
+def open_past_session():
+    """
+    Displays a list of saved sessions
+    and allows the student to open one.
+    """
+
+    create_session_folder()
+
+    # Find all saved JSON session files
+    files = [
+        file for file in os.listdir(SESSION_FOLDER)
+        if file.endswith(".json")
+    ]
+
+    if not files:
+        print("\nNo previous study sessions found.")
+        return
+
+    print("\n========== PAST STUDY SESSIONS ==========")
+
+    for index, filename in enumerate(files, start=1):
+        print(f"{index}. {filename}")
+
+    print("0. Return to main menu")
+
+    try:
+        choice = int(input("\nSelect a session to open: "))
+
+        if choice == 0:
+            return
+
+        if choice < 1 or choice > len(files):
+            print("Invalid session selection.")
+            return
+
+        selected_file = files[choice - 1]
+        filepath = os.path.join(SESSION_FOLDER, selected_file)
+
+        # Read and display the selected session
+        with open(filepath, "r", encoding="utf-8") as file:
+            session_data = json.load(file)
+
+        print("\n========== SESSION DETAILS ==========")
+        print(f"Student: {session_data['student_name']}")
+        print(f"Topic: {session_data['study_topic']}")
+        print(f"Date: {session_data['date']}")
+
+        print("\n========== CONVERSATION ==========")
+
+        for message in session_data["conversation"]:
+            if message["role"] == "user":
+                print(f"\nStudent: {message['content']}")
+
+            elif message["role"] == "assistant":
+                print(f"\nAI Study Buddy: {message['content']}")
+
+        print("\n========== FINAL SUMMARY ==========")
+        print(json.dumps(session_data["summary"], indent=4))
+
+    except ValueError:
+        print("Please enter a valid number.")
+
+    except FileNotFoundError:
+        print("The selected session file could not be found.")
+
+    except (OSError, json.JSONDecodeError, KeyError, TypeError) as error:
+        print(f"Unable to open session: {error}")
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 14 of 15
+9.8 summary.py
+# ==========================================
+# ECHO INTELLIGENT SOLUTIONS
+# AI STUDY BUDDY - SESSION SUMMARY
+# ==========================================
+
+import json
+
+from prompts import SUMMARY_PROMPT
+
+def prepare_summary_request(student_name, study_topic, messages, progress):
+    """
+    Prepares the complete conversation and actual
+    student performance records for Gemini.
+    """
+
+    conversation_text = ""
+
+    for message in messages:
+        if message["role"] == "user":
+            conversation_text += (
+                f"\nStudent: {message['content']}\n"
+            )
+
+        elif message["role"] == "assistant":
+            conversation_text += (
+                f"\nAI Study Buddy: {message['content']}\n"
+            )
+
+    # Convert actual Python progress records into JSON
+    progress_text = json.dumps(progress, indent=4)
+
+    summary_messages = [
+        {
+            "role": "user",
+            "content": (
+                f"Student Name: {student_name}\n"
+                f"Study Topic: {study_topic}\n\n"
+                f"Complete Study Conversation:\n"
+                f"{conversation_text}\n\n"
+                f"Actual Performance Records:\n"
+                f"{progress_text}\n\n"
+                "Generate the final study session summary. "
+                "Use the Python performance records as the "
+                "authoritative source for all scores and counts. "
+                "Do not invent or change these figures."
+            )
+        }
+    ]
+
+    return summary_messages
+
+
+def calculate_performance(correct_answers, total_questions):
+    """
+    Calculates the student's performance percentage.
+    """
+
+    if total_questions == 0:
+        return 0
+
+    percentage = (correct_answers / total_questions) * 100
+
+    return round(percentage, 2)
+
+
+def display_summary(summary):
+    """
+    Displays the final study report to the student.
+    """
+
+    print("\n===================================")
+    print("       STUDY SESSION SUMMARY")
+    print("===================================")
+
+    print(f"\nStudent: {summary.get('student_name', 'Unknown')}")
+    print(f"Subject: {summary.get('subject', 'Not specified')}")
+    print(f"Topic: {summary.get('topic', 'Not specified')}")
+
+    print("\nPerformance:")
+    print(f"Total Questions: {summary.get('total_questions', 0)}")
+    print(f"Correct Answers: {summary.get('correct_answers', 0)}")
+    print(f"Incorrect Answers: {summary.get('incorrect_answers', 0)}")
+
+    print(
+        f"Performance: "
+        f"{summary.get('performance_percentage', 0)}%"
+    )
+
+    print("\nStrengths:")
+
+    for strength in summary.get("strengths", []):
+        print(f"- {strength}")
+
+    print("\nTopics to Revise:")
+
+    for topic in summary.get("topics_to_revise", []):
+        print(f"- {topic}")
+
+    print("\nRecommendations:")
+
+    for recommendation in summary.get("recommendations", []):
+        print(f"- {recommendation}")
+
+    print("\nOverall Feedback:")
+    print(summary.get("overall_feedback", "Keep learning!"))
+
+    print("\n===================================")
+    print("Thank you for studying with us!")
+    print("===================================")
+
+
+def parse_summary_response(response):
+    """
+    Converts the AI summary response into a Python dictionary.
+    """
+
+    try:
+        summary = json.loads(response)
+
+        required_fields = [
+            "student_name",
+            "subject",
+            "topic",
+            "total_questions",
+            "correct_answers",
+            "incorrect_answers",
+            "performance_percentage",
+            "strengths",
+            "topics_to_revise",
+            "recommendations",
+            "overall_feedback"
+        ]
+
+        for field in required_fields:
+            if field not in summary:
+                raise ValueError(
+                    f"Summary is missing required field: {field}"
+                )
+
+        if not isinstance(summary["strengths"], list):
+            raise ValueError("Strengths must be a list.")
+
+        if not isinstance(summary["topics_to_revise"], list):
+            raise ValueError("Topics to revise must be a list.")
+
+        if not isinstance(summary["recommendations"], list):
+            raise ValueError("Recommendations must be a list.")
+
+        return summary
+
+    except json.JSONDecodeError:
+        print("Error: AI returned an invalid summary format.")
+
+    except ValueError as error:
+        print(f"Summary validation error: {error}")
+
+    return None
+Echo Intelligent Solutions — AI Study Buddy Project Report
+Page 15 of 15

@@ -7,11 +7,10 @@ import json
 
 from prompts import SUMMARY_PROMPT
 
-
-def prepare_summary_request(student_name, study_topic, messages):
+def prepare_summary_request(student_name, study_topic, messages, progress):
     """
-    Prepares the conversation history for the final
-    AI summary request.
+    Prepares the complete conversation and actual
+    student performance records for Gemini.
     """
 
     conversation_text = ""
@@ -27,19 +26,23 @@ def prepare_summary_request(student_name, study_topic, messages):
                 f"\nAI Study Buddy: {message['content']}\n"
             )
 
+    # Convert actual Python progress records into JSON
+    progress_text = json.dumps(progress, indent=4)
+
     summary_messages = [
-        {
-            "role": "system",
-            "content": SUMMARY_PROMPT
-        },
         {
             "role": "user",
             "content": (
                 f"Student Name: {student_name}\n"
-                f"Study Topic: {study_topic}\n"
+                f"Study Topic: {study_topic}\n\n"
                 f"Complete Study Conversation:\n"
                 f"{conversation_text}\n\n"
-                "Generate the final study session summary."
+                f"Actual Performance Records:\n"
+                f"{progress_text}\n\n"
+                "Generate the final study session summary. "
+                "Use the Python performance records as the "
+                "authoritative source for all scores and counts. "
+                "Do not invent or change these figures."
             )
         }
     ]
